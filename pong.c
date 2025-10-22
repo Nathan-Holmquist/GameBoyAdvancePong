@@ -112,8 +112,12 @@ struct rectangle
 };
 
 // Move CPU paddle according to ball y value
-void handle_cpu(struct rectangle *cpu, struct rectangle *ball)
+void handle_cpu(struct rectangle *cpu, struct rectangle *ball, unsigned short isFrozen)
 {
+    if (isFrozen)
+    { // Freeze ability is being used
+        return;
+    }
     // Move down if ball is below paddle, but stop at bottom
     if (ball->y > cpu->y && cpu->y + cpu->height < HEIGHT)
     {
@@ -164,8 +168,6 @@ void draw_rectangle(volatile unsigned short *buffer, struct rectangle *s)
     }
 }
 
-
-
 /* clear the screen right around the square */
 void update_screen(volatile unsigned short *buffer, unsigned short color, struct rectangle *s)
 {
@@ -213,68 +215,75 @@ void handle_buttons(struct rectangle *s)
     }
 }
 
-// detects intersections, returns 1 if rectangles overlap
+// detects intersections, returns 1 if rectangles overlap 0 otherwise
 int intersects(struct rectangle *a, struct rectangle *b)
 {
-    int a_right  = a->x + a->width;
-    int a_bottom = a->y + a->height;
-    int b_right  = b->x + b->width;
-    int b_bottom = b->y + b->height;
+    int aRight = a->x + a->width;
+    int aBottom = a->y + a->height;
+    int bRight = b->x + b->width;
+    int bBottom = b->y + b->height;
 
-    // Return true (1) if rectangles overlap, false (0) if they don't
-    return !(a_right  < b->x      ||  // a is completely left of b
-             a->x     > b_right   ||  // a is completely right of b
-             a_bottom < b->y      ||  // a is completely above b
-             a->y     > b_bottom);    // a is completely below b
+    return !(aRight < b->x ||  // a is left of b
+             a->x > bRight ||  // a is right of b
+             aBottom < b->y || // a is above b
+             a->y > bBottom);  // a is completely below b
+    // if none of those are true, they are intersecting
 }
 
 // CHANGE
 void draw_ball(volatile unsigned short *buffer, struct rectangle *ball, struct rectangle *paddle, struct rectangle *cpu, signed short *dx, signed short *dy)
 {
     short row, col; // for drawing the ball
-    
 
     // initial update
     ball->x += *dx;
     ball->y += *dy;
 
     // Ball hitting side walls
-    if (ball->x <= 0) { // left wall
+    if (ball->x <= 0)
+    { // left wall
         ball->x = 0;
         *dx = -*dx;
-    } else if (ball->x + ball->width >= WIDTH) { // right wall
+    }
+    else if (ball->x + ball->width >= WIDTH)
+    { // right wall
         ball->x = WIDTH - ball->width;
         *dx = -*dx;
     }
 
-    // Ball hitting top 
-    if (ball->y <= 0) {
+    // Ball hitting top
+    if (ball->y <= 0)
+    {
         ball->y = 0;
         *dy = -*dy;
-    } else if (ball->y + ball->height >= HEIGHT) { // ball hitting bottom
+    }
+    else if (ball->y + ball->height >= HEIGHT)
+    { // ball hitting bottom
         ball->y = HEIGHT - ball->height;
         *dy = -*dy;
     }
 
     // Bounce off player paddle
-    if (intersects(ball, paddle)) {
+    if (intersects(ball, paddle))
+    {
         *dx = 1;
     }
 
     // Bounce off cpu paddle
-    if (intersects(ball, cpu)) {
+    if (intersects(ball, cpu))
+    {
         *dx = -1;
     }
 
     // Draw new ball
-    for (row = ball->y; row < (ball->y + ball->height); row++) { // loop over rows
-        for (col = ball->x; col < (ball->x + ball->width); col++) { // loop over collums 
+    for (row = ball->y; row < (ball->y + ball->height); row++)
+    { // loop over rows
+        for (col = ball->x; col < (ball->x + ball->width); col++)
+        { // loop over collums
             put_pixel(buffer, row, col, ball->color);
         }
     }
 }
-
-
 
 /* clear the screen to black */
 void clear_screen(volatile unsigned short *buffer, unsigned short color)
@@ -290,35 +299,45 @@ void clear_screen(volatile unsigned short *buffer, unsigned short color)
     }
 }
 
-int checkVictory(struct rectangle *ball){
-    if (ball->x <= 10){ // Player win
+int checkVictory(struct rectangle *ball)
+{
+    if (ball->x <= 10)
+    { // Player win
         return 0;
-    } else if (ball->x >= 230){ // CPU win
+    }
+    else if (ball->x >= 230)
+    { // CPU win
         return 1;
-    } else {
+    }
+    else
+    {
         return 2;
     }
 }
 
+void resetGame(unsigned char black, struct rectangle *ball, struct rectangle *player, struct rectangle *cpu, signed short *ball_dx, signed short *ball_dy, unsigned short *cpuHandicap, unsigned short *frozenUsed)
+{
 
-void resetGame(unsigned char black, struct rectangle *ball, struct rectangle *player, struct rectangle *cpu, signed short *ball_dx, signed short *ball_dy, unsigned short *cpuHandicap) {
-    
+    *frozenUsed = 0; // reset freeze ability each round
     ball->x = 120;
     ball->y = 80;
 
-    // Found a rapidly changing byte to randomize off of
-    unsigned short randVal = *scanline_counter;
-
-    // Randomize direction based on bits of randVal
-    if (frameCounter & 1){
+    // Randomize direction based on bits of frameCounter
+    if (frameCounter & 1)
+    {
         *ball_dx = 1;
-    } else {
+    }
+    else
+    {
         *ball_dx = -1;
     }
 
-    if (frameCounter & 2){
+    if (frameCounter & 2)
+    {
         *ball_dy = 1;
-    } else {
+    }
+    else
+    {
         *ball_dy = -1;
     }
 
@@ -331,12 +350,14 @@ void resetGame(unsigned char black, struct rectangle *ball, struct rectangle *pl
     *cpuHandicap = 0;
 }
 
-void draw_score(volatile unsigned short *buffer, unsigned short playerScore, unsigned short cpuScore, unsigned char playerColor, unsigned char cpuColor){
+void draw_score(volatile unsigned short *buffer, unsigned short playerScore, unsigned short cpuScore, unsigned char playerColor, unsigned char cpuColor)
+{
     struct rectangle tally;
     unsigned short i;
 
     // Draw player tallies on the left
-    for (i = 0; i < playerScore; i++) {
+    for (i = 0; i < playerScore; i++)
+    {
         tally.x = WIDTH - 10 - (i + 1) * 8;
         tally.y = 5;
         tally.width = 5;
@@ -346,8 +367,9 @@ void draw_score(volatile unsigned short *buffer, unsigned short playerScore, uns
     }
 
     // Draw CPU tallies on the right
-    for (i = 0; i < cpuScore; i++) {
-        tally.x = 10 + i * 8;     // spacing between tallies, 10
+    for (i = 0; i < cpuScore; i++)
+    {
+        tally.x = 10 + i * 8; // spacing between tallies, 10
         tally.y = 5;
         tally.width = 5;
         tally.height = 3;
@@ -356,11 +378,14 @@ void draw_score(volatile unsigned short *buffer, unsigned short playerScore, uns
     }
 }
 
-void draw_net(volatile unsigned short *buffer, unsigned char white) {
-    int x = WIDTH / 2; // middle of screen x value
-    for (int y = 0; y < HEIGHT; y += 8) {  // loop from top to bottom of screen skipping over 8 pixels every time
-        for (int i = 0; i < 4; i++) {      // loop 4 times
-            put_pixel(buffer, x, y + i, white); // place pixel at y + i
+void draw_net(volatile unsigned short *buffer, unsigned char white)
+{
+    unsigned short x = WIDTH / 2; // middle of screen x value
+    for (unsigned short y = 0; y < HEIGHT; y += 8)
+    { // loop from top to bottom of screen skipping over 8 pixels every time
+        for (unsigned short i = 0; i < 4; i++)
+        {                                       // loop 4 times
+            put_pixel(buffer, y + 1, x, white); // place pixel at y + i
         }
     }
 }
@@ -370,7 +395,7 @@ int main()
 {
     /* we set the mode to mode 4 with bg2 on */
     *display_control = MODE4 | BG2;
-    
+
     signed short dx = -1;
     signed short dy = -1;
     unsigned short playerScore = 0;
@@ -383,8 +408,8 @@ int main()
 
     /* add black to the palette */
     unsigned char black = add_color(0, 0, 0);
-    unsigned char green = add_color(0,200,0);
-    unsigned char white = add_color(255,255,255);
+    unsigned char green = add_color(0, 200, 0);
+    unsigned char white = add_color(255, 255, 255);
 
     /* the buffer we start with */
     volatile unsigned short *buffer = front_buffer;
@@ -392,39 +417,51 @@ int main()
     /* clear whole screen first */
     clear_screen(front_buffer, black);
     clear_screen(back_buffer, black);
-    unsigned short cpuHandicap= 1; // boolean 
-    unsigned short lastVictory = 2;  // 2 = ongoing, 0 = player, 1 = cpu
-    
+    unsigned short cpuHandicap = 1; // boolean
+    unsigned short lastVictory = 2; // 2 = ongoing, 0 = player, 1 = cpu
+    unsigned short isFrozen = 0;
+    unsigned short frozenUsed = 0;
+    unsigned short freezeTimer = 0;
+
     /* loop forever */
     while (1)
     {
         frameCounter++;
+
         /* clear the screen - only the areas around the square! */
         update_screen(buffer, black, &player_rect);
         update_screen(buffer, black, &cpu_rect);
         update_screen(buffer, black, &ball_rect);
-        handle_cpu(&cpu_rect, &ball_rect);
+
+        handle_cpu(&cpu_rect, &ball_rect, isFrozen);
+        // Uncomment under this and comment the line above this to turn on Easy mode.
 
         // if (cpuHandicap == 1){
         //     cpuHandicap = 0;
-        //     handle_cpu(&cpu_rect, &ball_rect);
+        //     handle_cpu(&cpu_rect, &ball_rect, isFrozen);
+
         // } else {
         //     cpuHandicap = 1;
         // }
 
         unsigned short result = checkVictory(&ball_rect);
 
-        if (result != 2 && result != lastVictory) {
-            if (result == 0) {
+        if (result != 2 && result != lastVictory)
+        {
+            if (result == 0)
+            {
                 playerScore++;
-            } else if (result == 1) {
+            }
+            else if (result == 1)
+            {
                 cpuScore++;
             }
 
-            resetGame(black, &ball_rect, &player_rect, &cpu_rect, &dx, &dy, &cpuHandicap);
-            lastVictory = result;  // remember who won
-        } 
-        else if (result == 2) {
+            resetGame(black, &ball_rect, &player_rect, &cpu_rect, &dx, &dy, &cpuHandicap, &frozenUsed);
+            lastVictory = result; // remember who won
+        }
+        else if (result == 2)
+        {
             lastVictory = 2; // reset back to "no victory" once ball is in play
         }
 
@@ -432,13 +469,26 @@ int main()
         draw_net(buffer, white);
         draw_rectangle(buffer, &player_rect);
         draw_rectangle(buffer, &cpu_rect);
-        draw_ball(buffer,&ball_rect, &player_rect, &cpu_rect, &dx,&dy);
+        draw_ball(buffer, &ball_rect, &player_rect, &cpu_rect, &dx, &dy);
         draw_score(buffer, playerScore, cpuScore, white, green);
-        
-        
 
-        /* handle button input */
         handle_buttons(&player_rect);
+
+        if (button_pressed(BUTTON_A) && !frozenUsed && freezeTimer == 0)
+        {
+            isFrozen = 1;     // freeze CPU paddle
+            frozenUsed = 1;   // ability can’t be used again this round
+            freezeTimer = 60; // lasts for 15 frames
+        }
+
+        if (isFrozen && freezeTimer > 0)
+        {
+            freezeTimer--; // count down
+            if (freezeTimer == 0)
+            {
+                isFrozen = 0; // unfreeze when timer done
+            }
+        }
 
         /* wiat for vblank before switching buffers */
         wait_vblank();
